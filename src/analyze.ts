@@ -11,7 +11,7 @@ import {
 import { Parser } from 'acorn';
 import bindings from 'bindings';
 import { isIdentifierRead, isLoop, isVarLoop } from './utils/ast-helpers';
-import glob from 'glob';
+import { glob } from 'glob';
 import { getPackageBase } from './utils/get-package-base';
 import { pregyp, nbind } from './utils/binary-locators';
 import {
@@ -255,7 +255,7 @@ export default async function analyze(
   cwd = job.cwd;
   const pkgBase = getPackageBase(id);
 
-  const emitAssetDirectory = (wildcardPath: string) => {
+  const emitAssetDirectory = async (wildcardPath: string) => {
     if (!job.analysis.emitGlobs) return;
     const wildcardIndex = wildcardPath.indexOf(WILDCARD);
     const dirIndex =
@@ -276,25 +276,24 @@ export default async function analyze(
 
     assetEmissionPromises = assetEmissionPromises.then(async () => {
       if (job.log) console.log('Globbing ' + assetDirPath + wildcardPattern);
-      const files = await new Promise<string[]>((resolve, reject) =>
-        glob(
-          assetDirPath + wildcardPattern,
-          {
-            mark: true,
-            ignore: assetDirPath + '/**/node_modules/**/*',
-            dot: true,
-          },
-          (err, files) => (err ? reject(err) : resolve(files)),
-        ),
-      );
-      files
-        .filter(
-          (name) =>
-            !excludeAssetExtensions.has(path.extname(name)) &&
-            !excludeAssetFiles.has(path.basename(name)) &&
-            !name.endsWith('/'),
-        )
-        .forEach((file) => assets.add(file));
+      try {
+        const files = await glob(assetDirPath + wildcardPattern, {
+          mark: true,
+          ignore: assetDirPath + '/**/node_modules/**/*',
+          dot: true,
+        });
+
+        files
+          .filter(
+            (name) =>
+              !excludeAssetExtensions.has(path.extname(name)) &&
+              !excludeAssetFiles.has(path.basename(name)) &&
+              !name.endsWith('/'),
+          )
+          .forEach((file) => assets.add(file));
+      } catch (err) {
+        console.error(`Error occurred while globbing ${assetDirPath + wildcardPattern}:`, err);
+      }
     });
   };
 
@@ -497,21 +496,23 @@ export default async function analyze(
 
     assetEmissionPromises = assetEmissionPromises.then(async () => {
       if (job.log) console.log('Globbing ' + wildcardDirPath + wildcardPattern);
-      const files = await new Promise<string[]>((resolve, reject) =>
-        glob(
-          wildcardDirPath + wildcardPattern,
-          { mark: true, ignore: wildcardDirPath + '/**/node_modules/**/*' },
-          (err, files) => (err ? reject(err) : resolve(files)),
-        ),
-      );
-      files
-        .filter(
-          (name) =>
-            !excludeAssetExtensions.has(path.extname(name)) &&
-            !excludeAssetFiles.has(path.basename(name)) &&
-            !name.endsWith('/'),
-        )
-        .forEach((file) => deps.add(file));
+      try {
+        const files = await glob(wildcardDirPath + wildcardPattern, {
+          mark: true,
+          ignore: wildcardDirPath + '/**/node_modules/**/*'
+        });
+
+        files
+          .filter(
+            (name) =>
+              !excludeAssetExtensions.has(path.extname(name)) &&
+              !excludeAssetFiles.has(path.basename(name)) &&
+              !name.endsWith('/')
+          )
+          .forEach((file) => deps.add(file));
+      } catch (err) {
+        console.error(`Error occurred while globbing ${wildcardDirPath + wildcardPattern}:`, err);
+      }
     });
   }
 
