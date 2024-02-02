@@ -271,6 +271,8 @@ export default async function analyze(
         })
         .replace(repeatGlobRegEx, '/**/*') || '/**/*';
 
+    const dirPath = assetDirPath + wildcardPattern;
+
     if (job.ignoreFn(path.relative(job.base, assetDirPath + wildcardPattern)))
       return;
 
