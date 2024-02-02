@@ -277,9 +277,9 @@ export default async function analyze(
       return;
 
     assetEmissionPromises = assetEmissionPromises.then(async () => {
-      if (job.log) console.log('Globbing ' + assetDirPath + wildcardPattern);
+      if (job.log) console.log('Globbing ' + dirPath);
       try {
-        const files = await glob(assetDirPath + wildcardPattern, {
+        const files = await glob(dirPath, {
           mark: true,
           ignore: assetDirPath + '/**/node_modules/**/*',
           dot: true,
@@ -294,7 +294,7 @@ export default async function analyze(
           )
           .forEach((file) => assets.add(file));
       } catch (err) {
-        console.error(`Error occurred while globbing ${assetDirPath + wildcardPattern}:`, err);
+        console.error(`Error occurred while globbing ${dirPath}:`, err);
       }
     });
   };
