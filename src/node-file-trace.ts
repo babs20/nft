@@ -319,6 +319,8 @@ export class Job {
   }
 
   async emitDependency(path: string, parent?: string) {
+    console.log('emitDependency', path, parent);
+
     if (this.processed.has(path)) {
       if (parent) {
         await this.emitFile(path, 'dependency', parent);
@@ -366,6 +368,8 @@ export class Job {
       // directly as this will not be included in the cachedAnalysis and won't
       // be emit for successive runs that leverage the cache
       analyzeResult = await analyze(path, source.toString(), this);
+      console.log('analyzeResult', analyzeResult);
+
       this.analysisCache.set(path, analyzeResult);
     }
 

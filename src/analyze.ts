@@ -264,25 +264,38 @@ export default async function analyze(
         : wildcardPath.lastIndexOf(path.sep, wildcardIndex);
     const assetDirPath = wildcardPath.substring(0, dirIndex);
     const patternPath = wildcardPath.slice(dirIndex);
-    const wildcardPattern =
-      patternPath
-        .replace(wildcardRegEx, (_match, index) => {
-          return patternPath[index - 1] === path.sep ? '**/*' : '*';
-        })
-        .replace(repeatGlobRegEx, '/**/*') || '/**/*';
+    let wildcardPattern =
+      patternPath.replace(wildcardRegEx, (_match, index) => {
+        return patternPath[index - 1] === path.sep ? '**/*' : '*';
+      }) || '/**/*';
 
-    const dirPath = assetDirPath + wildcardPattern;
+    wildcardPattern = wildcardPattern.replace(repeatGlobRegEx, '/**/*');
 
-    if (job.ignoreFn(path.relative(job.base, assetDirPath + wildcardPattern)))
-      return;
+    // Normalize the path separators for cross-platform compatibility
+    const normalizedAssetDirPath = assetDirPath.split(path.sep).join('/');
+    const normalizedWildcardPattern = wildcardPattern.split(path.sep).join('/');
+
+    const wildcardJoinedPath = path.posix.join(
+      normalizedAssetDirPath,
+      normalizedWildcardPattern,
+    );
+
+    if (job.ignoreFn(path.relative(job.base, wildcardJoinedPath))) return;
 
     assetEmissionPromises = assetEmissionPromises.then(async () => {
-      if (job.log) console.log('Globbing ' + dirPath);
+      if (job.log) console.log('Globbing ' + wildcardJoinedPath);
+
+      const ignorePattern = path.posix.join(
+        normalizedAssetDirPath,
+        '**/node_modules/**/*',
+      );
+
       try {
-        const files = await glob(dirPath, {
+        const files = await glob(wildcardJoinedPath, {
           mark: true,
-          ignore: assetDirPath + '/**/node_modules/**/*',
+          ignore: ignorePattern,
           dot: true,
+          windowsPathsNoEscape: true,
         });
 
         files
@@ -290,11 +303,14 @@ export default async function analyze(
             (name) =>
               !excludeAssetExtensions.has(path.extname(name)) &&
               !excludeAssetFiles.has(path.basename(name)) &&
-              !name.endsWith('/'),
+              !name.endsWith(path.sep),
           )
           .forEach((file) => assets.add(file));
       } catch (err) {
-        console.error(`Error occurred while globbing ${dirPath}:`, err);
+        console.error(
+          `Error occurred while globbing ${wildcardJoinedPath}:`,
+          err,
+        );
       }
     });
   };
@@ -411,8 +427,11 @@ export default async function analyze(
   }
 
   if ((isESM || job.mixedModules) && isAst(ast)) {
+    console.log('HERE 1');
+
     for (const decl of ast.body) {
       if (decl.type === 'ImportDeclaration') {
+        console.log('HERE 2');
         const source = String(decl.source.value);
         deps.add(source);
         const staticModule =
@@ -439,6 +458,8 @@ export default async function analyze(
         decl.type === 'ExportNamedDeclaration' ||
         decl.type === 'ExportAllDeclaration'
       ) {
+        console.log('HERE 3');
+
         if (decl.source) deps.add(String(decl.source.value));
       }
     }
@@ -491,17 +512,26 @@ export default async function analyze(
       wildcardPattern +=
         '?(' + (job.ts ? '.ts|.tsx|' : '') + '.js|.json|.node)';
 
-    if (
-      job.ignoreFn(path.relative(job.base, wildcardDirPath + wildcardPattern))
-    )
-      return;
+    const normalizedWildcardDirPath = wildcardDirPath.split(path.sep).join('/');
+    const normalizedWildcardPattern = wildcardPattern.split(path.sep).join('/');
+    const wildcardJoinedPath = path.posix.join(
+      normalizedWildcardDirPath,
+      normalizedWildcardPattern,
+    );
+
+    if (job.ignoreFn(path.relative(job.base, wildcardJoinedPath))) return;
 
     assetEmissionPromises = assetEmissionPromises.then(async () => {
-      if (job.log) console.log('Globbing ' + wildcardDirPath + wildcardPattern);
+      if (job.log) console.log('Globbing ' + wildcardJoinedPath);
+
       try {
-        const files = await glob(wildcardDirPath + wildcardPattern, {
+        const files = await glob(wildcardJoinedPath, {
           mark: true,
-          ignore: wildcardDirPath + '/**/node_modules/**/*'
+          ignore: path.posix.join(
+            normalizedWildcardDirPath,
+            '**/node_modules/**/*',
+          ),
+          windowsPathsNoEscape: true,
         });
 
         files
@@ -509,11 +539,14 @@ export default async function analyze(
             (name) =>
               !excludeAssetExtensions.has(path.extname(name)) &&
               !excludeAssetFiles.has(path.basename(name)) &&
-              !name.endsWith('/')
+              !name.endsWith(path.sep),
           )
           .forEach((file) => deps.add(file));
       } catch (err) {
-        console.error(`Error occurred while globbing ${wildcardDirPath + wildcardPattern}:`, err);
+        console.error(
+          `Error occurred while globbing ${wildcardJoinedPath}:`,
+          err,
+        );
       }
     });
   }

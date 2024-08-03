@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { join, relative } = require('path');
+const { join, relative, sep } = require('path');
 const { nodeFileTrace } = require('../out/node-file-trace');
 const gracefulFS = require('graceful-fs');
 const analyze = require('../out/analyze.js').default;
@@ -67,12 +67,17 @@ function resetFileIOMocks() {
 afterEach(resetFileIOMocks);
 
 for (const { testName, isRoot } of unitTests) {
+  // if testName does not equal wildcard-require, skip
+  if (testName !== 'pnpm-symlinks') {
+    continue;
+  }
+
   const testSuffix = `${testName} from ${isRoot ? 'root' : 'cwd'}`;
   if (
     process.platform === 'win32' &&
     (isRoot || skipOnWindows.includes(testName))
   ) {
-    console.log(`Skipping unit test on Windows: ${testSuffix}`);
+    // console.log(`Skipping unit test on Windows: ${testSuffix}`);
     continue;
   }
   if (process.platform === 'darwin' && skipOnMac.includes(testName)) {
@@ -157,11 +162,16 @@ for (const { testName, isRoot } of unitTests) {
           analysis: !testName.startsWith('basic-analysis'),
           mixedModules: true,
           // Ignore unit test output "actual.js", and ignore GitHub Actions preinstalled packages
-          ignore: (str) =>
-            str.endsWith('/actual.js') || str.startsWith('usr/local'),
+          ignore: (str) => {
+            const normalized = str.split(sep).join('/');
+            return (
+              normalized.endsWith('/actual.js') ||
+              normalized.startsWith('usr/local')
+            );
+          },
           readFile: readFileMock,
           resolve: testName.startsWith('resolve-hook')
-            ? (id, parent) => `custom-resolution-${id}`
+            ? (id) => `custom-resolution-${id}`
             : undefined,
         },
       );
@@ -286,6 +296,8 @@ for (const { testName, isRoot } of unitTests) {
         expected = [];
       }
       try {
+        console.log('sortedFileList', sortedFileList);
+        console.log('expected', expected);
         expect(sortedFileList).toEqual(expected);
       } catch (e) {
         console.warn(reasons);

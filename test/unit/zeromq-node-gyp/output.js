@@ -1,5 +1,6 @@
 [
   "node_modules/@aminya/node-gyp-build/index.js",
+  "node_modules/@aminya/node-gyp-build/node-gyp-build.js",
   "node_modules/@aminya/node-gyp-build/package.json",
   "node_modules/zeromq/lib/draft.js",
   "node_modules/zeromq/lib/index.js",
